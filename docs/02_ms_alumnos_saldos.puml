@@ -1,0 +1,287 @@
+@startuml 02_ms_alumnos_saldos
+title EduSaldo · MS Alumnos y Saldos (8082) · db_alumnos_saldos\nHU14–HU23, HU35
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #1F4E79
+  ArrowColor #1F4E79
+}
+skinparam package {
+  BorderColor #1F4E79
+  BackgroundColor #EEF4FA
+}
+hide empty members
+
+package "MS Alumnos y Saldos" {
+  enum EstadoAlumno {
+    ACTIVO
+    INACTIVO
+  }
+
+  enum Parentesco {
+    MADRE
+    PADRE
+    TUTOR_LEGAL
+    ABUELO_A
+    OTRO
+  }
+
+  enum EstadoAsociacion {
+    ACTIVA
+    DESVINCULADA
+  }
+
+  enum TipoMovimientoSaldo {
+    ABONO
+    COMPROMISO_RESERVA
+    LIBERACION_RESERVA
+    DEBITO_VENTA
+    DEVOLUCION_VENTA
+    DEVOLUCION_SALDO
+    AJUSTE
+    CORRECCION
+  }
+
+  enum MedioDevolucion {
+    EFECTIVO
+    TRANSFERENCIA
+  }
+
+  enum EstadoAbono {
+    PENDIENTE
+    APROBADO
+    RECHAZADO
+  }
+
+  enum EstadoAlerta {
+    ACTIVA
+    RESUELTA
+  }
+
+  enum EstadoImportacion {
+    PREVISUALIZADA
+    CONFIRMADA
+    DESCARTADA
+  }
+
+  enum EstadoFilaImportacion {
+    VALIDA
+    PENDIENTE_REVISION
+    ERROR
+    IMPORTADA
+  }
+
+  class Alumno <<Entity>> {
+    - id : Long
+    - rut : String {unique}
+    - primerNombre : String
+    - segundoNombre : String [0..1]
+    - primerApellido : String
+    - segundoApellido : String [0..1]
+    - fechaNacimiento : LocalDate
+    - curso : String
+    - estado : EstadoAlumno
+    --
+    + getNombreCompleto() : String
+    + calcularEdad() : int
+    + puedeComprarDirecto() : boolean
+    + puedeReservar() : boolean
+    + getApoderadosActivos() : List<ApoderadoAlumno>
+    + tieneApoderadosActivos() : boolean
+    + asociarApoderado(apoderadoId : Long, p : Parentesco, asociadoPorId : Long) : ApoderadoAlumno
+    + desvincularApoderado(asociacionId : Long, desvinculadoPorId : Long, motivo : String) : void
+    + actualizarCurso(nuevoCurso : String) : void
+    + puedeInactivarse() : boolean
+    + inactivar() : void
+    + reactivar() : void
+  }
+
+  class ApoderadoAlumno <<Entity>> {
+    - id : Long
+    - apoderadoId : Long <<ref MS Auth>>
+    - parentesco : Parentesco
+    - estado : EstadoAsociacion
+    - fechaAsociacion : LocalDateTime
+    - asociadoPorId : Long <<ref MS Auth>>
+    - fechaDesvinculacion : LocalDateTime [0..1]
+    - desvinculadoPorId : Long [0..1] <<ref MS Auth>>
+    - motivoDesvinculacion : String [0..1]
+    --
+    + esActiva() : boolean
+    + desvincular(usuarioId : Long, motivo : String) : void
+  }
+
+  class CuentaSaldo <<Entity>> {
+    - id : Long
+    - saldoActual : int
+    - saldoComprometido : int
+    --
+    + getSaldoDisponible() : int
+    + tieneSaldoDisponible(monto : int) : boolean
+    + abonar(monto : int, abonoId : Long, usuarioId : Long, idempotencyKey : String) : MovimientoSaldo
+    + comprometer(monto : int, reservaId : Long, usuarioId : Long, idempotencyKey : String) : MovimientoSaldo
+    + liberar(monto : int, reservaId : Long, usuarioId : Long, idempotencyKey : String) : MovimientoSaldo
+    + debitar(monto : int, ventaId : Long, usuarioId : Long, idempotencyKey : String) : MovimientoSaldo
+    + finalizarReserva(monto : int, reservaId : Long, ventaId : Long, usuarioId : Long, idempotencyKey : String) : MovimientoSaldo
+    + reintegrar(monto : int, devolucionId : Long, usuarioId : Long, idempotencyKey : String) : MovimientoSaldo
+    + devolverSaldo(adminId : Long, apoderadoId : Long, medio : MedioDevolucion, comprobante : String, motivo : String, idempotencyKey : String) : DevolucionSaldo
+    + ajustar(monto : int, tipo : TipoMovimientoSaldo, motivo : String, adminId : Long, idempotencyKey : String) : MovimientoSaldo
+    + evaluarAlerta(umbral : int) : void
+  }
+
+  class MovimientoSaldo <<Entity>> {
+    - id : Long
+    - tipo : TipoMovimientoSaldo
+    - monto : int
+    - saldoResultante : int
+    - fecha : LocalDateTime
+    - referenciaTipo : String
+    - referenciaId : Long [0..1]
+    - idempotencyKey : String {unique}
+    - usuarioId : Long [0..1] <<ref MS Auth>>
+    - descripcion : String
+  }
+
+  class AlertaSaldoBajo <<Entity>> {
+    - id : Long
+    - estado : EstadoAlerta
+    - umbralAplicado : int
+    - saldoAlActivar : int
+    - saldoActual : int
+    - fechaActivacion : LocalDateTime
+    - correoEnviado : boolean
+    - fechaEnvioCorreo : LocalDateTime [0..1]
+    - fechaResolucion : LocalDateTime [0..1]
+    --
+    + actualizarSaldo(saldo : int) : void
+    + marcarCorreoEnviado() : void
+    + resolver() : void
+  }
+
+  class DevolucionSaldo <<Entity>> {
+    - id : Long
+    - monto : int
+    - apoderadoId : Long <<ref MS Auth>>
+    - medio : MedioDevolucion
+    - comprobante : String
+    - motivo : String
+    - fecha : LocalDateTime
+    - registradaPorId : Long <<ref MS Auth>>
+    - idempotencyKey : String {unique}
+  }
+
+  class Abono <<Entity>> {
+    - id : Long
+    - alumnoId : Long
+    - apoderadoId : Long <<ref MS Auth>>
+    - monto : int
+    - tokenTransaccion : String {unique}
+    - estado : EstadoAbono
+    - fechaCreacion : LocalDateTime
+    - fechaResolucion : LocalDateTime [0..1]
+    --
+    + aprobar() : void
+    + rechazar() : void
+  }
+
+  class ImportacionNomina <<Entity>> {
+    - id : Long
+    - nombreArchivo : String
+    - fecha : LocalDateTime
+    - usuarioId : Long <<ref MS Auth>>
+    - estado : EstadoImportacion
+    --
+    + getTotalAlumnos() : int
+    + getApoderadosNuevos() : int
+    + getApoderadosExistentes() : int
+    + getAsociacionesNuevas() : int
+    + getTotalPendientesRevision() : int
+    + getTotalErrores() : int
+    + confirmar() : void
+    + descartar() : void
+  }
+
+  class DetalleImportacion <<Entity>> {
+    - id : Long
+    - numeroFila : int
+    - rutAlumno : String
+    - rutApoderado : String
+    - datosOriginales : String
+    - estado : EstadoFilaImportacion
+    - observacion : String [0..1]
+    - apoderadoNuevo : boolean
+    - apoderadoId : Long [0..1] <<ref MS Auth>>
+    - alumnoId : Long [0..1]
+  }
+}
+
+Alumno "1" *-- "1..*" ApoderadoAlumno : tiene apoderados >
+Alumno "1" *-- "1" CuentaSaldo : tiene >
+CuentaSaldo "1" *-- "0..*" MovimientoSaldo : explica >
+CuentaSaldo "1" *-- "0..*" AlertaSaldoBajo : ciclos de alerta >
+Alumno "1" -- "0..*" Abono : recibe >
+CuentaSaldo "1" -- "0..*" DevolucionSaldo : devuelve >
+DevolucionSaldo "1" --> "1" MovimientoSaldo : genera >
+Abono "1" --> "0..1" MovimientoSaldo : genera al aprobarse >
+ImportacionNomina "1" *-- "1..*" DetalleImportacion : filas >
+DetalleImportacion "0..*" --> "0..1" Alumno : crea / reutiliza >
+
+note left of ApoderadoAlumno
+  Relación N:M Apoderado–Alumno.
+  Invariantes:
+  • Alumno ACTIVO ⇒ ≥ 1 asociación ACTIVA.
+  • Apoderado ⇒ ≥ 1 asociación (no existe sin alumno).
+  • HU15 – alta en un solo paso: datos del alumno →
+    apoderado (nuevo o existente por RUT) + parentesco
+    → confirmar; se crean alumno, usuario y asociación
+    juntos (con compensación si falla MS Auth).
+  • HU16 – agregar otro apoderado o desvincular.
+  • No se elimina: se DESVINCULA con fecha, usuario y
+    motivo. No se puede desvincular la última asociación
+    ACTIVA de un alumno ACTIVO sin reemplazarla.
+  • Única por (apoderadoId, alumno).
+end note
+
+note bottom of AlertaSaldoBajo
+  HU23: máx. 1 alerta ACTIVA por cuenta.
+  Al cruzar el umbral (param. $3.000) → ACTIVA y
+  1 correo a cada apoderado con asociación ACTIVA.
+  Si el saldo sigue bajando → solo se actualiza.
+  Abono sobre el umbral → RESUELTA. Nuevo cruce
+  → nuevo ciclo (nueva AlertaSaldoBajo).
+end note
+
+note right of DetalleImportacion
+  HU14: cada fila queda registrada. Datos
+  contradictorios → PENDIENTE_REVISION, sin
+  sobrescribir ni crear el alumno: es la
+  constancia de los casos excepcionales.
+  Filas sin apoderado válido → ERROR.
+end note
+
+note bottom of DevolucionSaldo
+  HU18 – Devolución de saldo (retiro o cambio de colegio):
+  la entrega del dinero es manual (fuera de la web), pero el
+  Administrador la REGISTRA. Requisitos: sin reservas
+  pendientes (saldoComprometido = 0); monto = saldo total.
+  Efectos: MovimientoSaldo DEVOLUCION_SALDO (saldo → 0) y
+  egreso DEVOLUCION_SALDO en la caja de MS Finanzas.
+  Con saldo 0 el alumno puede pasar a INACTIVO.
+end note
+
+note right of Abono
+  Webpay SIMULADO: solo un abono APROBADO
+  se acredita como MovimientoSaldo ABONO.
+end note
+
+note bottom of CuentaSaldo
+  saldoDisponible = saldoActual − saldoComprometido
+  Invariante: saldoDisponible >= 0 (HU35).
+  Integraciones REST:
+  • 8081 Auth: crear/reutilizar Apoderado (HU15)
+  • 8084 Ventas: reservar/liberar/finalizar saldo
+  • 8086 Finanzas: ingreso por abono / egreso por devolución
+end note
+@enduml
