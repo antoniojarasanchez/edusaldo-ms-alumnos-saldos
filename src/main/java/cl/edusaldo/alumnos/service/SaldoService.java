@@ -6,6 +6,7 @@ import cl.edusaldo.alumnos.dto.FinalizarReservaDTO;
 import cl.edusaldo.alumnos.dto.MovimientoSaldoDTO;
 import cl.edusaldo.alumnos.model.CuentaSaldo;
 import cl.edusaldo.alumnos.model.MovimientoSaldo;
+import cl.edusaldo.alumnos.model.TipoMovimientoSaldo;
 import cl.edusaldo.alumnos.repository.CuentaSaldoRepository;
 import cl.edusaldo.alumnos.repository.MovimientoSaldoRepository;
 import org.springframework.stereotype.Service;
@@ -35,8 +36,14 @@ public class SaldoService {
         CuentaSaldo cuenta = cuentaSaldoRepository.findByAlumnoId(alumnoId)
                 .orElseThrow(() -> new IllegalArgumentException("Cuenta de saldo no encontrada para el alumno ID: " + alumnoId));
 
-        MovimientoSaldo mov = cuenta.comprometer(dto.getMonto(), dto.getReservaId(), dto.getUsuarioId(), dto.getIdempotencyKey());
-        cuentaSaldoRepository.save(cuenta);
+        cuenta.comprometer(dto.getMonto());
+        cuenta = cuentaSaldoRepository.save(cuenta);
+
+        MovimientoSaldo mov = new MovimientoSaldo(
+                cuenta, TipoMovimientoSaldo.COMPROMISO_RESERVA, dto.getMonto(), cuenta.getSaldoActual(),
+                "RESERVA", dto.getReservaId(), dto.getIdempotencyKey(), dto.getUsuarioId(), "Compromiso de saldo por reserva #" + dto.getReservaId()
+        );
+        mov = movimientoSaldoRepository.save(mov);
         return new MovimientoSaldoDTO(mov);
     }
 
@@ -50,8 +57,14 @@ public class SaldoService {
         CuentaSaldo cuenta = cuentaSaldoRepository.findByAlumnoId(alumnoId)
                 .orElseThrow(() -> new IllegalArgumentException("Cuenta de saldo no encontrada para el alumno ID: " + alumnoId));
 
-        MovimientoSaldo mov = cuenta.finalizarReserva(dto.getMonto(), dto.getReservaId(), dto.getVentaId(), dto.getUsuarioId(), dto.getIdempotencyKey());
-        cuentaSaldoRepository.save(cuenta);
+        cuenta.finalizarReserva(dto.getMonto());
+        cuenta = cuentaSaldoRepository.save(cuenta);
+
+        MovimientoSaldo mov = new MovimientoSaldo(
+                cuenta, TipoMovimientoSaldo.DEBITO_VENTA, dto.getMonto(), cuenta.getSaldoActual(),
+                "VENTA_RESERVA", dto.getVentaId(), dto.getIdempotencyKey(), dto.getUsuarioId(), "Débito definitivo por entrega de reserva #" + dto.getReservaId() + " (Venta #" + dto.getVentaId() + ")"
+        );
+        mov = movimientoSaldoRepository.save(mov);
         return new MovimientoSaldoDTO(mov);
     }
 
@@ -65,8 +78,14 @@ public class SaldoService {
         CuentaSaldo cuenta = cuentaSaldoRepository.findByAlumnoId(alumnoId)
                 .orElseThrow(() -> new IllegalArgumentException("Cuenta de saldo no encontrada para el alumno ID: " + alumnoId));
 
-        MovimientoSaldo mov = cuenta.liberar(monto, reservaId, usuarioId, idempotencyKey);
-        cuentaSaldoRepository.save(cuenta);
+        cuenta.liberar(monto);
+        cuenta = cuentaSaldoRepository.save(cuenta);
+
+        MovimientoSaldo mov = new MovimientoSaldo(
+                cuenta, TipoMovimientoSaldo.LIBERACION_RESERVA, monto, cuenta.getSaldoActual(),
+                "RESERVA", reservaId, idempotencyKey, usuarioId, "Liberación de saldo por cancelación de reserva #" + reservaId
+        );
+        mov = movimientoSaldoRepository.save(mov);
         return new MovimientoSaldoDTO(mov);
     }
 
@@ -80,8 +99,14 @@ public class SaldoService {
         CuentaSaldo cuenta = cuentaSaldoRepository.findByAlumnoId(alumnoId)
                 .orElseThrow(() -> new IllegalArgumentException("Cuenta de saldo no encontrada para el alumno ID: " + alumnoId));
 
-        MovimientoSaldo mov = cuenta.abonar(dto.getMonto(), 1L, dto.getApoderadoId(), dto.getIdempotencyKey());
-        cuentaSaldoRepository.save(cuenta);
+        cuenta.abonar(dto.getMonto());
+        cuenta = cuentaSaldoRepository.save(cuenta);
+
+        MovimientoSaldo mov = new MovimientoSaldo(
+                cuenta, TipoMovimientoSaldo.ABONO, dto.getMonto(), cuenta.getSaldoActual(),
+                "ABONO", 1L, dto.getIdempotencyKey(), dto.getApoderadoId(), "Aporte de saldo vía Webpay"
+        );
+        mov = movimientoSaldoRepository.save(mov);
         return new MovimientoSaldoDTO(mov);
     }
 

@@ -74,6 +74,7 @@ class SaldoServiceTest {
         when(cuentaSaldoRepository.findByAlumnoId(1L)).thenReturn(Optional.of(cuentaPrueba));
         when(movimientoSaldoRepository.existsByIdempotencyKey("KEY-02")).thenReturn(false);
         when(cuentaSaldoRepository.save(any(CuentaSaldo.class))).thenAnswer(i -> i.getArgument(0));
+        when(movimientoSaldoRepository.save(any(MovimientoSaldo.class))).thenAnswer(i -> i.getArgument(0));
 
         ComprometerSaldoDTO dto = new ComprometerSaldoDTO();
         dto.setMonto(4000L);
@@ -95,12 +96,13 @@ class SaldoServiceTest {
     @DisplayName("3. Finalización atómica de reserva reduce saldo comprometido y actual sin doble cobro (HU33)")
     void testFinalizarReservaReduceComprometidoYActualSinDuplicidad() {
         // Estado previo: reserva activa de 4.000 comprometida
-        cuentaPrueba.comprometer(4000L, 103L, 4L, "KEY-INIT");
+        cuentaPrueba.comprometer(4000L);
         assertEquals(6000L, cuentaPrueba.getSaldoDisponible());
 
         when(cuentaSaldoRepository.findByAlumnoId(1L)).thenReturn(Optional.of(cuentaPrueba));
         when(movimientoSaldoRepository.existsByIdempotencyKey("KEY-03")).thenReturn(false);
         when(cuentaSaldoRepository.save(any(CuentaSaldo.class))).thenAnswer(i -> i.getArgument(0));
+        when(movimientoSaldoRepository.save(any(MovimientoSaldo.class))).thenAnswer(i -> i.getArgument(0));
 
         FinalizarReservaDTO dto = new FinalizarReservaDTO();
         dto.setMonto(4000L);
@@ -113,7 +115,6 @@ class SaldoServiceTest {
 
         assertNotNull(res);
         assertEquals(TipoMovimientoSaldo.DEBITO_VENTA, res.getTipo());
-        // Invariante atómica: comprometido vuelve a 0, actual baja a 6.000, disponible queda exactamente en 6.000
         assertEquals(0L, cuentaPrueba.getSaldoComprometido());
         assertEquals(6000L, cuentaPrueba.getSaldoActual());
         assertEquals(6000L, cuentaPrueba.getSaldoDisponible());
