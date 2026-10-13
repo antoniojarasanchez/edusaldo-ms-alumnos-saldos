@@ -5,7 +5,7 @@ spring:
   application:
     name: ms-alumnos-saldos
   datasource:
-    url: jdbc:mysql://localhost:3306/db_alumnos_saldos?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    url: jdbc:mysql://localhost:3306/db_alumnos_saldos?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: root
     password: ""
   jpa:
