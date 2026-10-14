@@ -1,6 +1,20 @@
 @startuml 02_ms_alumnos_saldos
-!include estilo.iuml
-title EduSaldo · MS Saldos y Abonos (8082) · db_saldos\nCómo llega el abono al alumno · saldo, movimientos y alertas
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype polyline
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #1F4E79
+  ArrowColor #1F4E79
+}
+skinparam package {
+  BorderColor #1F4E79
+  BackgroundColor #EEF4FA
+}
+hide empty members
+skinparam nodesep 45
+skinparam ranksep 55
+title EduSaldo · MS Saldos y Abonos (8082) · db_saldos\nCómo llega el abono al alumno · saldo y movimientos
 
 legend top right
   «ADM» Administrador · «ENC» Encargado · «APO» Apoderado
@@ -38,17 +52,11 @@ package "MS Saldos y Abonos" {
     DEVOLUCION_SALDO
   }
 
-  enum EstadoAlerta {
-    ACTIVA
-    RESUELTA
-  }
-
-  class Abono <<Entity>> {
-    - id : Long
+  class Abono {
     - apoderadoId : Long
     - alumnoId : Long
     - monto : int
-    - tokenTransaccion : String {unique}
+    - tokenTransaccion : String
     - estado : EstadoAbono
     - fechaCreacion : LocalDateTime
     - expiraEn : LocalDateTime
@@ -60,27 +68,26 @@ package "MS Saldos y Abonos" {
     + rechazar(token : String) : void «SIS»
   }
 
-  class CuentaSaldo <<Entity>> {
-    - id : Long
-    - alumnoId : Long {unique}
+  class CuentaSaldo {
+    - alumnoId : Long
     - saldoActual : int
     - saldoComprometido : int
     - bloqueadaHasta : LocalDateTime [0..1]
     --
-    + getSaldoDisponible() : int «APO» «ALU» «ENC»
-    + bloquear(segundos : int) : boolean «SIS»
+    + getSaldoDisponible() : int «APO» «ALU» «ENC» «ADM»
+    + bloquearTemporalmente(segundos : int) : boolean «SIS»
     + desbloquear() : void «SIS»
-    + acreditarAbono(abono : Abono) : MovimientoSaldo «SIS»
-    + comprometer(monto : int, reservaId : Long) : MovimientoSaldo «SIS»
-    + liberar(monto : int, reservaId : Long) : MovimientoSaldo «SIS»
-    + descontarEntrega(monto : int, entregaId : Long) : MovimientoSaldo «SIS»
-    + reintegrar(monto : int, devolucionId : Long) : MovimientoSaldo «SIS»
-    + devolverSaldo(apoderadoId : Long, motivo : String) : DevolucionSaldo «ADM»
-    + getMovimientos() : List<MovimientoSaldo> «APO» «ALU» «ENC»
+    + acreditarMontoAbonado(abono : Abono) : MovimientoSaldo «SIS»
+    + retenerSaldoPorReserva(monto : int, reservaId : Long) : MovimientoSaldo «SIS»
+    + liberarSaldoRetenido(monto : int, reservaId : Long) : MovimientoSaldo «SIS»
+    + cobrarEntregaMateriales(monto : int, entregaId : Long, vieneDeReserva : boolean) : MovimientoSaldo «SIS»
+    + reembolsarPorDevolucion(monto : int, devolucionId : Long) : MovimientoSaldo «SIS»
+    + liquidarSaldoPorRetiro(apoderadoId : Long, medio : String, comprobante : String, motivo : String) : MovimientoSaldo «ADM»
+    + cruzoUmbralSaldoBajo(saldoAnterior : int, umbral : int) : boolean «SIS»
+    + getMovimientos() : List<MovimientoSaldo> «APO» «ALU» «ENC» «ADM»
   }
 
-  class MovimientoSaldo <<Entity>> {
-    - id : Long
+  class MovimientoSaldo {
     - tipo : TipoMovimientoSaldo
     - monto : int
     - saldoResultante : int
@@ -88,63 +95,40 @@ package "MS Saldos y Abonos" {
     - referenciaId : Long [0..1]
     - descripcion : String
   }
-
-  class AlertaSaldoBajo <<Entity>> {
-    - id : Long
-    - estado : EstadoAlerta
-    - umbral : int
-    - fechaActivacion : LocalDateTime
-    - correoEnviado : boolean
-    --
-    + enviarCorreo(apoderados : List<Apoderado>) : void «SIS»
-    + resolver() : void «SIS»
-  }
-
-  class DevolucionSaldo <<Entity>> {
-    - id : Long
-    - monto : int
-    - apoderadoId : Long
-    - motivo : String
-    - fecha : LocalDateTime
-    - registradaPorId : Long
-  }
 }
 
-Apoderado "1" -- "0..*" Abono : 1. paga >
-Abono "0..*" --> "1" Alumno : para >
-Alumno "1" -- "1" CuentaSaldo : tiene >
-Abono "1" ..> "0..1" MovimientoSaldo : 3. al aprobarse genera >
-CuentaSaldo "1" *-- "0..*" MovimientoSaldo : 4. explica el saldo >
-CuentaSaldo "1" *-- "0..*" AlertaSaldoBajo
-CuentaSaldo "1" -- "0..*" DevolucionSaldo
-DevolucionSaldo "1" ..> "1" MovimientoSaldo : genera >
+' Referencias externas (hacia MS Usuarios por ID)
+Apoderado "1" ..> "0..*" Abono : 1. inicia pago (apoderadoId) >
+Abono "0..*" ..> "1" Alumno : destinatario (alumnoId) >
+CuentaSaldo "1" ..> "1" Alumno : pertenece a (alumnoId) >
+
+' Recorrido interno del abono y generación de movimientos
+Abono "0..*" ..> "1" CuentaSaldo : 2. al aprobarse acredita en >
+CuentaSaldo "1" *-- "0..*" MovimientoSaldo : 3. registra cada operación en >
+
+' Conexión de Enums con sus Clases
+Abono ..> EstadoAbono : estado
+MovimientoSaldo ..> TipoMovimientoSaldo : tipo
 
 note bottom of Abono
-  Cómo llega el abono al alumno (Webpay SIMULADO):
-  1. El Apoderado inicia el abono para un alumno suyo
-     → Abono PENDIENTE con tokenTransaccion y expiraEn.
-  2. La pasarela simulada responde con el token:
-     verificarToken() comprueba que existe, que está
-     PENDIENTE y que no venció (estaVigente()).
-  3. Si se aprueba: CuentaSaldo.bloquear() → acreditarAbono()
-     → MovimientoSaldo ABONO → desbloquear().
-  4. Un token ya usado o vencido no se acredita otra vez
-     (EXPIRADO / RECHAZADO).
+  Recorrido del abono (pasarela simulada):
+  1. Apoderado inicia abono → Abono PENDIENTE con tokenTransaccion.
+  2. Al confirmar el pago, verificarToken() valida vigencia y estado.
+  3. CuentaSaldo.bloquearTemporalmente() → acreditarMontoAbonado()
+     → genera MovimientoSaldo (tipo ABONO) → desbloquear().
 end note
 
 note right of CuentaSaldo
-  saldoDisponible = saldoActual − saldoComprometido ≥ 0.
-  Bloqueo con tiempo (bloqueadaHasta) en vez de
-  idempotencia: mientras una operación procesa la
-  cuenta, otra espera; si algo falla, el bloqueo
-  vence solo al pasar el tiempo.
-  DevolucionSaldo: el dinero se entrega a mano;
-  aquí solo se registra y el saldo queda en 0.
-end note
-
-note bottom of AlertaSaldoBajo
-  Al bajar del umbral (parámetro, $3.000) se envía
-  un correo a todos los apoderados del alumno.
-  Se resuelve con un abono que lo supere.
+  • saldoDisponible = saldoActual − saldoComprometido ≥ 0.
+  • Único punto de generación de MovimientoSaldo para los 6 tipos:
+    - ABONO: acreditarMontoAbonado()
+    - RESERVA: retenerSaldoPorReserva()
+    - LIBERACION_RESERVA: liberarSaldoRetenido()
+    - ENTREGA: cobrarEntregaMateriales()
+    - DEVOLUCION: reembolsarPorDevolucion()
+    - DEVOLUCION_SALDO: liquidarSaldoPorRetiro()
+  • Alerta de saldo bajo: cruzoUmbralSaldoBajo() detecta el cruce
+    hacia abajo del umbral ($3.000) tras un cobro y dispara un único
+    correo a los apoderados sin requerir tabla de alertas.
 end note
 @enduml
