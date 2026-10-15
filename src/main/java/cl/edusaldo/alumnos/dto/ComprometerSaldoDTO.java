@@ -8,7 +8,7 @@ public class ComprometerSaldoDTO {
 
     @NotNull(message = "El monto es obligatorio")
     @Positive(message = "El monto debe ser positivo")
-    private Long monto;
+    private int monto;
 
     @NotNull(message = "El ID de la reserva es obligatorio")
     private Long reservaId;
@@ -21,12 +21,15 @@ public class ComprometerSaldoDTO {
 
     public ComprometerSaldoDTO() {}
 
-    public Long getMonto() { return monto; }
-    public void setMonto(Long monto) { this.monto = monto; }
+    public int getMonto() { return monto; }
+    public void setMonto(int monto) { this.monto = monto; }
+
     public Long getReservaId() { return reservaId; }
     public void setReservaId(Long reservaId) { this.reservaId = reservaId; }
+
     public Long getUsuarioId() { return usuarioId; }
     public void setUsuarioId(Long usuarioId) { this.usuarioId = usuarioId; }
+
     public String getIdempotencyKey() { return idempotencyKey; }
     public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
 }

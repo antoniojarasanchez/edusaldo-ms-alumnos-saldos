@@ -11,7 +11,7 @@ public class AbonarSaldoDTO {
 
     @NotNull(message = "El monto es obligatorio")
     @Positive(message = "El monto a abonar debe ser mayor a 0")
-    private Long monto;
+    private int monto;
 
     @NotBlank(message = "La llave de idempotencia es obligatoria")
     private String idempotencyKey;
@@ -20,8 +20,10 @@ public class AbonarSaldoDTO {
 
     public Long getApoderadoId() { return apoderadoId; }
     public void setApoderadoId(Long apoderadoId) { this.apoderadoId = apoderadoId; }
-    public Long getMonto() { return monto; }
-    public void setMonto(Long monto) { this.monto = monto; }
+
+    public int getMonto() { return monto; }
+    public void setMonto(int monto) { this.monto = monto; }
+
     public String getIdempotencyKey() { return idempotencyKey; }
     public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
 }

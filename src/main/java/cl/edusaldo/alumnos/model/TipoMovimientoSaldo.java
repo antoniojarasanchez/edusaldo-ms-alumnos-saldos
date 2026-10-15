@@ -2,11 +2,12 @@ package cl.edusaldo.alumnos.model;
 
 public enum TipoMovimientoSaldo {
     ABONO,
-    COMPROMISO_RESERVA,
+    RESERVA,
     LIBERACION_RESERVA,
-    DEBITO_VENTA,
-    DEVOLUCION_VENTA,
+    ENTREGA,
+    DEVOLUCION,
     DEVOLUCION_SALDO,
-    AJUSTE,
-    CORRECCION
+    COMPROMISO_RESERVA,
+    DEBITO_VENTA,
+    DEVOLUCION_VENTA
 }
